@@ -11,23 +11,25 @@ UNICODE_PIECES = {
 
 
 def render_board(board: chess.Board) -> None:
-    print("\n    a b c d e f g h")
-    print("   -----------------")
+    print("\n       a   b   c   d   e   f   g   h")
+    print("    +---+---+---+---+---+---+---+---+")
 
     for rank in range(7, -1, -1):
-        print(f" {rank + 1} |", end=" ")
+        print(f"  {rank + 1} |", end="")
         for file in range(8):
             square = chess.square(file, rank)
             piece = board.piece_at(square)
 
             if piece is None:
-                print(".", end=" ")
+                symbol = " "
             else:
-                print(UNICODE_PIECES[piece.symbol()], end=" ")
-        print(f"| {rank + 1}")
+                symbol = UNICODE_PIECES[piece.symbol()]
 
-    print("   -----------------")
-    print("    a b c d e f g h\n")
+            print(f" {symbol} |", end="")
+        print(f" {rank + 1}")
+        print("    +---+---+---+---+---+---+---+---+")
+
+    print("       a   b   c   d   e   f   g   h\n")
 
     print("Turn:", "White" if board.turn == chess.WHITE else "Black")
     print("Legal moves:", board.legal_moves.count())
