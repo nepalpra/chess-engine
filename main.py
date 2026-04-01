@@ -1,4 +1,13 @@
 import chess
+from engine import find_best_move
+
+
+import chess
+
+UNICODE_PIECES = {
+    "P": "♟", "N": "♞", "B": "♝", "R": "♜", "Q": "♛", "K": "♚",
+    "p": "♙", "n": "♘", "b": "♗", "r": "♖", "q": "♕", "k": "♔"
+}
 
 
 def render_board(board: chess.Board) -> None:
@@ -14,7 +23,7 @@ def render_board(board: chess.Board) -> None:
             if piece is None:
                 print(".", end=" ")
             else:
-                print(piece.symbol(), end=" ")
+                print(UNICODE_PIECES[piece.symbol()], end=" ")
         print(f"| {rank + 1}")
 
     print("   -----------------")
@@ -36,17 +45,12 @@ def render_board(board: chess.Board) -> None:
         print("Status: Game over")
 
 
-def main():
-    board = chess.Board()
-
-    while not board.is_game_over():
-        render_board(board)
-
+def get_user_move(board: chess.Board) -> chess.Move:
+    while True:
         move_text = input("Enter move in UCI format like e2e4, or 'quit': ").strip()
 
         if move_text.lower() == "quit":
-            print("Exiting game.")
-            break
+            return None
 
         try:
             move = chess.Move.from_uci(move_text)
@@ -58,7 +62,39 @@ def main():
             print("Illegal move. Try again.\n")
             continue
 
-        board.push(move)
+        return move
+
+
+def main():
+    board = chess.Board()
+    ai_depth = 3
+
+    print("Welcome to CLI Chess.")
+    print("You are White. AI is Black.")
+    print("Enter moves in UCI format like e2e4.\n")
+
+    while not board.is_game_over():
+        render_board(board)
+
+        if board.turn == chess.WHITE:
+            move = get_user_move(board)
+
+            if move is None:
+                print("Exiting game.")
+                break
+
+            board.push(move)
+
+        else:
+            print("AI is thinking...")
+            ai_move = find_best_move(board, ai_depth)
+
+            if ai_move is None:
+                print("AI could not find a move.")
+                break
+
+            print(f"AI plays: {ai_move}\n")
+            board.push(ai_move)
 
     render_board(board)
     print("Result:", board.result() if board.is_game_over() else "Game not finished")
