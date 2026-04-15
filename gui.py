@@ -24,6 +24,14 @@ WHITE_PIECE = (247, 245, 240)
 WHITE_PIECE_BORDER = (70, 70, 70)
 BLACK_PIECE = (36, 41, 46)
 BLACK_PIECE_BORDER = (215, 220, 228)
+BUTTON_FILL = (75, 109, 172)
+BUTTON_HOVER = (94, 130, 196)
+BUTTON_TEXT = (248, 250, 252)
+
+COLOR_NAMES = {
+    chess.WHITE: "White",
+    chess.BLACK: "Black",
+}
 
 PIECE_LABELS = {
     chess.PAWN: "P",
@@ -49,6 +57,16 @@ def get_status_text(board: chess.Board) -> str:
     return "White to move" if board.turn == chess.WHITE else "Black to move"
 
 
+def square_to_display(square: int, perspective: chess.Color) -> tuple[int, int]:
+    file_index = chess.square_file(square)
+    rank_index = chess.square_rank(square)
+
+    if perspective == chess.WHITE:
+        return file_index, 7 - rank_index
+
+    return 7 - file_index, rank_index
+
+
 def get_legal_targets(board: chess.Board, from_square: int | None) -> set[int]:
     if from_square is None:
         return set()
@@ -60,14 +78,22 @@ def get_legal_targets(board: chess.Board, from_square: int | None) -> set[int]:
     }
 
 
-def mouse_to_square(position: tuple[int, int]) -> int | None:
+def mouse_to_square(position: tuple[int, int], perspective: chess.Color) -> int | None:
     mouse_x, mouse_y = position
 
     if mouse_x < 0 or mouse_x >= BOARD_SIZE or mouse_y < 0 or mouse_y >= BOARD_SIZE:
         return None
 
-    file_index = mouse_x // SQUARE_SIZE
-    rank_index = 7 - (mouse_y // SQUARE_SIZE)
+    screen_file = mouse_x // SQUARE_SIZE
+    screen_rank = mouse_y // SQUARE_SIZE
+
+    if perspective == chess.WHITE:
+        file_index = screen_file
+        rank_index = 7 - screen_rank
+    else:
+        file_index = 7 - screen_file
+        rank_index = screen_rank
+
     return chess.square(file_index, rank_index)
 
 
@@ -87,17 +113,19 @@ def draw_board(
     screen: pygame.Surface,
     board: chess.Board,
     fonts: dict[str, pygame.font.Font],
+    player_color: chess.Color,
     selected_square: int | None,
     legal_targets: set[int],
     last_move: chess.Move | None,
 ) -> None:
-    for rank in range(8):
-        for file_index in range(8):
-            square = chess.square(file_index, 7 - rank)
-            square_x = file_index * SQUARE_SIZE
-            square_y = rank * SQUARE_SIZE
+    for square_rank in range(8):
+        for square_file in range(8):
+            square = chess.square(square_file, square_rank)
+            display_file, display_rank = square_to_display(square, player_color)
+            square_x = display_file * SQUARE_SIZE
+            square_y = display_rank * SQUARE_SIZE
 
-            base_color = LIGHT_SQUARE if (file_index + rank) % 2 == 0 else DARK_SQUARE
+            base_color = LIGHT_SQUARE if (display_file + display_rank) % 2 == 0 else DARK_SQUARE
             pygame.draw.rect(screen, base_color, (square_x, square_y, SQUARE_SIZE, SQUARE_SIZE))
 
             if last_move is not None and square in {last_move.from_square, last_move.to_square}:
@@ -127,12 +155,14 @@ def draw_board(
             screen.blit(label, label_rect)
 
     for file_index in range(8):
-        file_label = fonts["coords"].render(chr(ord("a") + file_index), True, MUTED_TEXT)
+        display_file = file_index if player_color == chess.WHITE else 7 - file_index
+        file_label = fonts["coords"].render(chr(ord("a") + display_file), True, MUTED_TEXT)
         file_rect = file_label.get_rect(center=(file_index * SQUARE_SIZE + SQUARE_SIZE // 2, BOARD_SIZE - 12))
         screen.blit(file_label, file_rect)
 
     for rank in range(8):
-        rank_label = fonts["coords"].render(str(8 - rank), True, MUTED_TEXT)
+        display_rank = 8 - rank if player_color == chess.WHITE else rank + 1
+        rank_label = fonts["coords"].render(str(display_rank), True, MUTED_TEXT)
         rank_rect = rank_label.get_rect(center=(12, rank * SQUARE_SIZE + SQUARE_SIZE // 2))
         screen.blit(rank_label, rank_rect)
 
@@ -141,16 +171,19 @@ def draw_sidebar(
     screen: pygame.Surface,
     board: chess.Board,
     fonts: dict[str, pygame.font.Font],
+    player_color: chess.Color,
     last_move: chess.Move | None,
 ) -> None:
     sidebar_rect = pygame.Rect(BOARD_SIZE, 0, SIDEBAR_WIDTH, WINDOW_HEIGHT)
     pygame.draw.rect(screen, SIDEBAR_BACKGROUND, sidebar_rect)
+    ai_color = not player_color
 
     lines = [
         ("GUI MODE", fonts["title"], SIDEBAR_TEXT),
-        ("Click a white piece.", fonts["body"], SIDEBAR_TEXT),
+        (f"You control {COLOR_NAMES[player_color]}.", fonts["body"], SIDEBAR_TEXT),
+        (f"AI controls {COLOR_NAMES[ai_color]}.", fonts["body"], SIDEBAR_TEXT),
+        ("Click one of your pieces.", fonts["body"], SIDEBAR_TEXT),
         ("Then click its destination.", fonts["body"], SIDEBAR_TEXT),
-        ("AI controls Black.", fonts["body"], SIDEBAR_TEXT),
         (f"Turn: {'White' if board.turn == chess.WHITE else 'Black'}", fonts["body"], SIDEBAR_TEXT),
         (f"Status: {get_status_text(board)}", fonts["body"], SIDEBAR_TEXT),
         (f"Legal moves: {board.legal_moves.count()}", fonts["body"], SIDEBAR_TEXT),
@@ -184,17 +217,82 @@ def draw_scene(
     screen: pygame.Surface,
     board: chess.Board,
     fonts: dict[str, pygame.font.Font],
+    player_color: chess.Color,
     selected_square: int | None,
     legal_targets: set[int],
     last_move: chess.Move | None,
 ) -> None:
     screen.fill(BACKGROUND)
-    draw_board(screen, board, fonts, selected_square, legal_targets, last_move)
-    draw_sidebar(screen, board, fonts, last_move)
+    draw_board(screen, board, fonts, player_color, selected_square, legal_targets, last_move)
+    draw_sidebar(screen, board, fonts, player_color, last_move)
 
 
 def reset_game() -> tuple[chess.Board, int | None, set[int], chess.Move | None]:
     return chess.Board(), None, set(), None
+
+
+def draw_color_button(
+    screen: pygame.Surface,
+    font: pygame.font.Font,
+    rect: pygame.Rect,
+    label: str,
+    is_hovered: bool,
+) -> None:
+    fill_color = BUTTON_HOVER if is_hovered else BUTTON_FILL
+    pygame.draw.rect(screen, fill_color, rect, border_radius=12)
+    text_surface = font.render(label, True, BUTTON_TEXT)
+    text_rect = text_surface.get_rect(center=rect.center)
+    screen.blit(text_surface, text_rect)
+
+
+def choose_player_color(
+    screen: pygame.Surface,
+    clock: pygame.time.Clock,
+    fonts: dict[str, pygame.font.Font],
+) -> chess.Color | None:
+    white_button = pygame.Rect(140, 360, 240, 68)
+    black_button = pygame.Rect(520, 360, 240, 68)
+
+    while True:
+        mouse_position = pygame.mouse.get_pos()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return None
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    return None
+                if event.key == pygame.K_w:
+                    return chess.WHITE
+                if event.key == pygame.K_b:
+                    return chess.BLACK
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if white_button.collidepoint(event.pos):
+                    return chess.WHITE
+                if black_button.collidepoint(event.pos):
+                    return chess.BLACK
+
+        screen.fill(BACKGROUND)
+
+        title = fonts["title"].render("Choose Your Side", True, SIDEBAR_TEXT)
+        subtitle = fonts["subtitle"].render("Press W for White or B for Black", True, MUTED_TEXT)
+        detail = fonts["body"].render("Choose a side to start a new game.", True, MUTED_TEXT)
+
+        title_rect = title.get_rect(center=(WINDOW_WIDTH // 2, 180))
+        subtitle_rect = subtitle.get_rect(center=(WINDOW_WIDTH // 2, 250))
+        detail_rect = detail.get_rect(center=(WINDOW_WIDTH // 2, 295))
+
+        screen.blit(title, title_rect)
+        screen.blit(subtitle, subtitle_rect)
+        screen.blit(detail, detail_rect)
+
+        draw_color_button(screen, fonts["body"], white_button, "Play as White", white_button.collidepoint(mouse_position))
+        draw_color_button(screen, fonts["body"], black_button, "Play as Black", black_button.collidepoint(mouse_position))
+
+        pygame.display.flip()
+        clock.tick(FPS)
 
 
 def run_gui() -> None:
@@ -211,6 +309,11 @@ def run_gui() -> None:
         "coords": pygame.font.SysFont("arial", 16),
     }
 
+    player_color = choose_player_color(screen, clock, fonts)
+    if player_color is None:
+        pygame.quit()
+        return
+
     board, selected_square, legal_targets, last_move = reset_game()
     running = True
 
@@ -226,10 +329,10 @@ def run_gui() -> None:
                     board, selected_square, legal_targets, last_move = reset_game()
 
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                if board.turn != chess.WHITE or board.is_game_over(claim_draw=True):
+                if board.turn != player_color or board.is_game_over(claim_draw=True):
                     continue
 
-                clicked_square = mouse_to_square(event.pos)
+                clicked_square = mouse_to_square(event.pos, player_color)
                 if clicked_square is None:
                     selected_square = None
                     legal_targets = set()
@@ -239,7 +342,7 @@ def run_gui() -> None:
 
                 if (
                     clicked_piece is not None
-                    and clicked_piece.color == chess.WHITE
+                    and clicked_piece.color == player_color
                     and (selected_square is None or clicked_square != selected_square)
                 ):
                     selected_square = clicked_square
@@ -259,8 +362,8 @@ def run_gui() -> None:
                     selected_square = None
                     legal_targets = set()
 
-        if running and not board.is_game_over(claim_draw=True) and board.turn == chess.BLACK:
-            draw_scene(screen, board, fonts, selected_square, legal_targets, last_move)
+        if running and not board.is_game_over(claim_draw=True) and board.turn != player_color:
+            draw_scene(screen, board, fonts, player_color, selected_square, legal_targets, last_move)
             pygame.display.flip()
 
             ai_move = find_best_move(board, AI_DEPTH)
@@ -271,7 +374,7 @@ def run_gui() -> None:
             selected_square = None
             legal_targets = set()
 
-        draw_scene(screen, board, fonts, selected_square, legal_targets, last_move)
+        draw_scene(screen, board, fonts, player_color, selected_square, legal_targets, last_move)
         pygame.display.flip()
         clock.tick(FPS)
 
