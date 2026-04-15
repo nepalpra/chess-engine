@@ -9,6 +9,11 @@ UNICODE_PIECES = {
     "p": "♟", "n": "♞", "b": "♝", "r": "♜", "q": "♛", "k": "♚"
 }
 
+COLOR_NAMES = {
+    chess.WHITE: "White",
+    chess.BLACK: "Black",
+}
+
 
 def render_board(board: chess.Board) -> None:
     print("\n       a   b   c   d   e   f   g   h")
@@ -69,19 +74,39 @@ def get_user_move(board: chess.Board) -> chess.Move | None:
         return move
 
 
+def choose_cli_side() -> chess.Color | None:
+    while True:
+        choice = input("Choose your side ([w]hite/[b]lack) or 'quit': ").strip().lower()
+
+        if choice in {"quit", "q"}:
+            return None
+        if choice in {"w", "white"}:
+            return chess.WHITE
+        if choice in {"b", "black"}:
+            return chess.BLACK
+
+        print("Invalid choice. Enter 'w', 'white', 'b', 'black', or 'quit'.\n")
+
+
 def run_cli() -> None:
     board = chess.Board()
     ai_depth = 3
 
     print("Starting CLI mode.")
     print("Welcome to CLI Chess.")
-    print("You are White. AI is Black.")
+    player_color = choose_cli_side()
+    if player_color is None:
+        print("Exiting game.")
+        return
+
+    ai_color = not player_color
+    print(f"You are {COLOR_NAMES[player_color]}. AI is {COLOR_NAMES[ai_color]}.")
     print("Enter moves in UCI format like e2e4.\n")
 
     while not board.is_game_over(claim_draw=True):
         render_board(board)
 
-        if board.turn == chess.WHITE:
+        if board.turn == player_color:
             move = get_user_move(board)
 
             if move is None:
