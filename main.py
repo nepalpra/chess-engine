@@ -1,12 +1,12 @@
+import sys
+
 import chess
+
 from engine import find_best_move
 
-
-import chess
-
 UNICODE_PIECES = {
-    "P": "♟", "N": "♞", "B": "♝", "R": "♜", "Q": "♛", "K": "♚",
-    "p": "♙", "n": "♘", "b": "♗", "r": "♖", "q": "♕", "k": "♔"
+    "P": "♙", "N": "♘", "B": "♗", "R": "♖", "Q": "♕", "K": "♔",
+    "p": "♟", "n": "♞", "b": "♝", "r": "♜", "q": "♛", "k": "♚"
 }
 
 
@@ -43,11 +43,13 @@ def render_board(board: chess.Board) -> None:
         print("Status: Stalemate")
     elif board.is_insufficient_material():
         print("Status: Draw by insufficient material")
+    elif board.can_claim_draw():
+        print("Status: Draw can be claimed")
     elif board.is_game_over():
         print("Status: Game over")
 
 
-def get_user_move(board: chess.Board) -> chess.Move:
+def get_user_move(board: chess.Board) -> chess.Move | None:
     while True:
         move_text = input("Enter move in UCI format like e2e4, or 'quit': ").strip()
 
@@ -67,15 +69,16 @@ def get_user_move(board: chess.Board) -> chess.Move:
         return move
 
 
-def main():
+def run_cli() -> None:
     board = chess.Board()
     ai_depth = 3
 
+    print("Starting CLI mode.")
     print("Welcome to CLI Chess.")
     print("You are White. AI is Black.")
     print("Enter moves in UCI format like e2e4.\n")
 
-    while not board.is_game_over():
+    while not board.is_game_over(claim_draw=True):
         render_board(board)
 
         if board.turn == chess.WHITE:
@@ -99,8 +102,43 @@ def main():
             board.push(ai_move)
 
     render_board(board)
-    print("Result:", board.result() if board.is_game_over() else "Game not finished")
+    print("Result:", board.result(claim_draw=True) if board.is_game_over(claim_draw=True) else "Game not finished")
+
+
+def print_usage() -> None:
+    print("Usage:")
+    print("  python3 main.py      # Run the CLI version")
+    print("  python3 main.py gui  # Run the Pygame GUI version")
+
+
+def run_gui() -> int:
+    try:
+        from gui import run_gui as launch_gui
+    except ModuleNotFoundError as exc:
+        if exc.name == "pygame":
+            print("GUI mode requires the 'pygame' package.")
+            print("Install it with: python3 -m pip install pygame")
+            return 1
+        raise
+
+    print("Starting GUI mode.")
+    launch_gui()
+    return 0
+
+
+def main(args: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if args is None else args
+
+    if not argv:
+        run_cli()
+        return 0
+
+    if len(argv) == 1 and argv[0] == "gui":
+        return run_gui()
+
+    print_usage()
+    return 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
