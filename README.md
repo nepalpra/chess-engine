@@ -26,6 +26,5 @@ pip install -r requirements.txt
 ```
 
 4. Run the project:
-```bash
-python main.py
-```
+- `python3 main.py` runs the CLI version.
+- `python3 main.py gui` runs the Pygame GUI version.
